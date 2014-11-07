@@ -23,7 +23,7 @@ class RNN(object):
 
 		self.activ = T.nnet.sigmoid
 		lr = T.scalar()
-		u = T.fvector()
+		u = T.vector('u')
 		t = T.scalar()
 
 		W_uh = theano.shared(W_uh, 'W_uh')
@@ -64,10 +64,10 @@ if __name__ == '__main__':
 	e = 1
 	vals = []
 	for i in xrange(int(5e5)):
-        size = int(np.random.uniform()*20) + 5
+		size = int(np.random.uniform()*20) + 5
 
-        u = np.random.normal(size=size)
-        t = [np.sign(u[0])] * size
+		u = np.random.normal(size=size)
+		t = [np.sign(u[0])] * size
 		c = rnn.train_step(u, t, lr)
 
 		if i % 1000 == 0: print "iteration {0}: {1}".format(i, np.sqrt(c))
