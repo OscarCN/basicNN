@@ -149,7 +149,7 @@ class dA(object):
        """ Computes the reconstructed input given the values of the hidden layer """
        return  T.nnet.sigmoid(T.dot(hidden, self.W_prime) + self.b_prime)
 
-   def get_cost_updates(self, corruption_level, learning_rate):
+   def get_cost_updates(self, corruption_level, learning_rate, momentum=1):
        """ This function computes the cost and the updates for one trainng
        step of the dA """
 
@@ -176,6 +176,24 @@ class dA(object):
        return cost, updates
 
 
+def fileToList(filename):
+    with open(filename) as f:
+        lines = f.read().splitlines()
+    return lines
+
+def vecOf(wrd, wrds, vecs, ndim=50):
+    try:
+        itolook = wrds.index(wrd)
+    except Exception:
+        return pn.Series([np.nan] * ndim)
+
+    return vecs.iloc[itolook]
+
+def getcommon(wrds, vecs):
+    l = fileToList('/Users/OscarInn/Documents/NLP/google-10000-english/google-10000-english.txt')
+    emb = pn.DataFrame([vecOf(wrd,wrds,vecs).tolist() for wrd in l if not vecOf(wrd,wrds,vecs) is None], columns=['emb' + str(i+1) for i in range(50)], index=l)
+
+    return l, emb
 
 if __name__ == '__main__':
 
@@ -186,13 +204,22 @@ if __name__ == '__main__':
                                  borrow=borrow)
 
         return shared_x
+    # CHOOSE DATASET
+    wrds = fileToList('/Users/OscarInn/Documents/NLP/senna/hash/words.lst')
+    vecs = pn.read_csv('/Users/OscarInn/Documents/NLP/senna/embeddings/embeddings.txt', sep=' ', header=None, names=['emb' + str(i) for i in range(1,51)])
+
 
     train_set_x = shared_dataset(pn.read_csv('word_embeddings').as_matrix()[:,1:51])
 
+    wrds,embs = getcommon(wrds,vecs)
+    embs = embs[np.isfinite(embs['emb1'])]
+    wrds = embs.index.tolist()
+    train_set_x = shared_dataset(embs.as_matrix())
+
     # ========== hyper-parameters ==========
     learning_rate = .1
-    batch_size = 500
-    training_epochs = 200
+    batch_size = 1000
+    training_epochs = 10000
     n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
     # ========== ==================== ==========
 
@@ -222,14 +249,14 @@ if __name__ == '__main__':
     ############
     # TRAINING #
     ############
-
+    cfull = []
     # go through training epochs
     for epoch in xrange(training_epochs):
         # go through trainng set
         c = []
         for batch_index in xrange(n_train_batches):
             c.append(train_da(batch_index))
-
+        cfull.append(numpy.mean(c))
         print 'Training epoch %d, cost ' % epoch, numpy.mean(c)
 
     end_time = time.clock()
@@ -240,18 +267,33 @@ if __name__ == '__main__':
 
 
 
-
     inp = T.dvector('inp')
     encoded = da.get_hidden_values(inp)
-
-    #encoded = T.mean(inp)
     encode_da = theano.function([inp], encoded)
 
+    wtf = []
+    for wrd in wrds[10000:130000]:
+        v = vecOf(wrd, wrds, vecs).tolist()
+        en = encode_da(np.array(v, dtype=theano.config.floatX))
 
-    v = vecOf('two', wrds, vecs).tolist()
-    encode_da(np.array(v, dtype=theano.config.floatX))
+        if np.std(en) > .1:
+            print wrd
+            wtf.append(wrd)
 
 
+    wtfemb = []
+    for wrd in wtf:
+        v = vecOf(wrd, wrds, vecs).tolist()
+        en = encode_da(np.array(v, dtype=theano.config.floatX))
+        wtfemb.append(en.tolist())
 
 
+    for wemb in wtfemb:
+        for i in range(len(wemb)):
+            if wemb[i] < .5:
+                wemb[i] = 0
+            if wemb[i] >= .5:
+                wemb[i] = 1
+
+    d = dict(zip(wtf,wtfemb))
 
